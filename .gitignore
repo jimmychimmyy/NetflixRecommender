@@ -1,2 +1,4 @@
 netflix-prize-data/*
 netflix_data_clean/*
+
+!netflix_data_clean/.gitkeep
