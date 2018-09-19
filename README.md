@@ -10,3 +10,4 @@
 
 ### TODO
 * add interactive option for user to select which movie to provide rating for
+* use pyspark to improve performance (https://www.davidadrian.cc/posts/2017/08/how-to-spark-cluster/)

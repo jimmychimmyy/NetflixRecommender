@@ -6,7 +6,6 @@ import csv
 import dask.dataframe as dd
 import dask.multiprocessing
 from sklearn.metrics.pairwise import cosine_similarity
-from multiprocessing.dummy import Pool
 import multiprocessing
 import functools
 import time
@@ -33,6 +32,7 @@ class NetflixRecommender():
     def __init__(self):
         self.movie_id = "1"
         self.customer_id = "1488844"
+        warnings.filterwarnings("ignore")
 
     def read_train_data(self):
         # Read Rating data into df
@@ -40,17 +40,17 @@ class NetflixRecommender():
         print("df.head()", '\n', df.head(10))
         return df
 
-    def read_test_data(self):
+    '''def read_test_data(self):
         df_probe = dd.read_csv(FILEPATH_PROBE, sep='\n', header=None, names=['info']).compute()
         print("df_probe.head():", df_probe.head())
-        return df_probe
+        return df_probe'''
 
-    def get_movie_indices(self):
+    '''def get_movie_indices(self):
         movie_rows = self.df[(self.df['movie_id'].str.contains(':'))] #.compute()
         movie_indices = list(movie_rows.head(-1).index)
         #print("len(movie_indices):", len(movie_indices))
         #print("movie_indicies:", movie_indices)
-        return movie_indices
+        return movie_indices'''
 
     def get_num_movies(self):
         movies = set((self.df['movie_id'].head(-1).values).tolist())
@@ -89,14 +89,21 @@ class NetflixRecommender():
         return cosine_similarity(x, y)
 
     def compute_weighted_rating(self, user):
+        warnings.filterwarnings("ignore") # is needed bc of parallel processing
         feat_vector = self.get_feature_vector(str(user))
         sim_score = self.compute_similarity(feat_vector)
+        mean = np.mean([x for x in feat_vector if x != 0])
+        delta_rating = (self.similar_users[user] - mean)
         #print("similarity:", sim_score[0][0])
         #print(self.similar_users[user])
         w_rating = self.similar_users[user] * sim_score[0][0]
-        print("weighted rating:", w_rating, "rating:", self.similar_users[user], "similarity score:", sim_score[0][0])
+        '''print("weighted rating:", w_rating, \
+            "rating:", self.similar_users[user], \
+            "similarity score:", sim_score[0][0], \
+            "mean:", mean, \
+            "delta rating:", delta_rating)'''
         #return sim_score[0][0]
-        return w_rating
+        return (w_rating, mean, delta_rating)
 
     def main(self):
         # TODO need to pass movie_id and customer_id
@@ -104,13 +111,19 @@ class NetflixRecommender():
         self.num_movies = self.get_num_movies()
         self.my_feature_vector = self.get_feature_vector(self.customer_id)
         print(self.my_feature_vector)
+        print("len(my_feature_vector):", len(self.my_feature_vector))
+        my_ratings = [x for x in self.my_feature_vector if x != 0]
+        print("my_ratings:", my_ratings)
+        print('len(my_ratings):', len(my_ratings))
+        print('mean:', np.mean(my_ratings))
 
         self.similar_users = self.get_similar_users()
 
         start = time.time()
         num_cores = multiprocessing.cpu_count()
         print('num_cores:', num_cores)
-        res = Parallel(n_jobs=num_cores)(delayed(self.compute_weighted_rating)(i) for i in list(self.similar_users))
+        res = Parallel(n_jobs=num_cores, verbose=1) \
+            (delayed(self.compute_weighted_rating)(i) for i in list(self.similar_users))
         end = time.time()
         print("time elapsed:", end - start)
 
@@ -131,8 +144,17 @@ class NetflixRecommender():
         print("time:", end - start)
         res = self.w_ratings'''
 
-        print("predicted rating:")
-        print((sum(res) / len(res)))
+        print("predicted rating using w_rating:")
+        print(np.mean([x for x in res[0] if x != 0]))
+        #print((sum(res) / len(res)))
+
+        print("mean score for this movie:")
+        print(np.mean(res[1]))
+
+        print("mean change in mean score from rating")
+        print(np.mean(res[2]))
+
+        print("predicted rating using mean change in mean score: ...")
 
 
 
